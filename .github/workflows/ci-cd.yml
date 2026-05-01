@@ -1,4 +1,4 @@
-name: BFSI Credit Intelligence CI/CD
+name: BFSI Credit Intelligence CI
 
 on:
   push:
@@ -6,13 +6,9 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  AWS_REGION: ap-south-1
-  IMAGE_TAG: ${{ github.sha }}
-
 jobs:
   test:
-    name: Tests & Security Scan
+    name: Lint & Test
     runs-on: ubuntu-latest
 
     services:
@@ -45,25 +41,20 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pytest pytest-asyncio pytest-cov httpx bandit
+          pip install pytest pytest-asyncio pytest-cov httpx flake8
           pip install -r requirements.txt || true
 
-      - name: Lint (syntax errors + undefined names)
+      - name: Lint (syntax errors + undefined names only)
         run: |
-          pip install flake8
           flake8 backend/ tests/ \
             --select=E9,F63,F7,F82 \
             --count --show-source --statistics
 
-      - name: Security scan (Bandit)
-        run: bandit -r backend/ -ll --exit-zero
-
-      - name: Run tests with coverage
+      - name: Run tests
         env:
           DATABASE_URL: postgresql+asyncpg://bfsi_user:testpassword@localhost:5432/bfsi_test
           REDIS_URL: redis://localhost:6379/0
-          # Real key via secret when available; CI uses dummy (tests mock all LLM calls)
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'sk-ant-ci-dummy-key-not-real' }}
+          ANTHROPIC_API_KEY: sk-ant-ci-dummy-key-not-real
           ENCRYPTION_KEY: "test_encryption_key_32bytes_paddd"
           ENVIRONMENT: test
           LOG_LEVEL: WARNING
@@ -76,79 +67,3 @@ jobs:
             --cov=backend \
             --cov-report=term-missing \
             --cov-fail-under=40
-
-  security-scan:
-    name: Container Security Scan
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main' && secrets.ECR_REGISTRY != ''
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build image for scanning
-        run: docker build -f infra/docker/backend.Dockerfile -t bfsi-scan:latest .
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: bfsi-scan:latest
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: 1
-
-  build-and-push:
-    name: Build & Push to ECR
-    runs-on: ubuntu-latest
-    needs: [test, security-scan]
-    if: github.ref == 'refs/heads/main' && secrets.ECR_REGISTRY != ''
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-      - name: Build and push backend
-        run: |
-          docker build -f infra/docker/backend.Dockerfile \
-            -t ${{ secrets.ECR_REGISTRY }}/bfsi-backend:$IMAGE_TAG \
-            -t ${{ secrets.ECR_REGISTRY }}/bfsi-backend:latest .
-          docker push ${{ secrets.ECR_REGISTRY }}/bfsi-backend:$IMAGE_TAG
-          docker push ${{ secrets.ECR_REGISTRY }}/bfsi-backend:latest
-
-  deploy:
-    name: Deploy to EKS (Mumbai)
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main' && secrets.ECR_REGISTRY != ''
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Deploy to EKS
-        run: |
-          aws eks update-kubeconfig --name bfsi-eks-production --region $AWS_REGION
-          kubectl set image deployment/bfsi-backend \
-            backend=${{ secrets.ECR_REGISTRY }}/bfsi-backend:$IMAGE_TAG \
-            -n bfsi-prod
-          kubectl rollout status deployment/bfsi-backend -n bfsi-prod --timeout=5m
-      - name: Smoke test
-        run: |
-          URL=$(kubectl get svc bfsi-backend-svc -n bfsi-prod \
-            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          curl -f http://$URL/health/ready || exit 1
-      - name: Notify Slack on failure
-        if: failure()
-        uses: slackapi/slack-github-action@v1.26.0
-        with:
-          payload: '{"text":"🚨 BFSI deploy FAILED — ${{ github.sha }} by ${{ github.actor }}"}'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
