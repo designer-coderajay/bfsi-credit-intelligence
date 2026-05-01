@@ -41,15 +41,22 @@ class ComplianceCheckerAgent:
     def __init__(self, llm: Optional[BaseChatModel] = None):
         """
         Args:
-            llm: Optional LangChain chat model. Creates ChatAnthropic default if None.
+            llm: Optional LangChain chat model. Lazily created on first use if None.
         """
-        if llm is not None:
-            self.llm = llm
-        else:
+        self._llm = llm
+
+    @property
+    def llm(self) -> BaseChatModel:
+        if self._llm is None:
             from langchain_anthropic import ChatAnthropic
             from backend.core.config import get_settings
             s = get_settings()
-            self.llm = ChatAnthropic(model=s.llm_model, api_key=s.anthropic_api_key, max_tokens=1024)
+            self._llm = ChatAnthropic(model=s.llm_model, api_key=s.anthropic_api_key, max_tokens=1024)
+        return self._llm
+
+    @llm.setter
+    def llm(self, val: BaseChatModel) -> None:
+        self._llm = val
 
     async def check(self, state: LoanApplicationState) -> dict:
         logger.info(f"[ComplianceChecker] Checking compliance for {state.application_id}")

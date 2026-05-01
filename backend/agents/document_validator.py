@@ -47,16 +47,23 @@ class DocumentValidatorAgent:
     def __init__(self, llm: Optional[BaseChatModel] = None):
         """
         Args:
-            llm: Optional LangChain chat model. Creates ChatAnthropic default if None.
+            llm: Optional LangChain chat model. Lazily created on first use if None.
         """
-        if llm is not None:
-            self.llm = llm
-        else:
+        self._llm = llm  # stored; ChatAnthropic only created on first access
+        self.ocr = OCRPipeline()
+
+    @property
+    def llm(self) -> BaseChatModel:
+        if self._llm is None:
             from langchain_anthropic import ChatAnthropic
             from backend.core.config import get_settings
             s = get_settings()
-            self.llm = ChatAnthropic(model=s.llm_model, api_key=s.anthropic_api_key, max_tokens=2048)
-        self.ocr = OCRPipeline()
+            self._llm = ChatAnthropic(model=s.llm_model, api_key=s.anthropic_api_key, max_tokens=2048)
+        return self._llm
+
+    @llm.setter
+    def llm(self, val: BaseChatModel) -> None:
+        self._llm = val
 
     def _normalize_doc_types(self, docs: list[str]) -> list[str]:
         return [DOC_ALIASES.get(d, d) for d in docs]
