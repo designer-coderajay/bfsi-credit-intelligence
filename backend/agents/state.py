@@ -15,14 +15,17 @@ class LoanApplicationState(BaseModel):
     # Application identifiers
     application_id: str = ""
     applicant_id: str = ""
-    loan_type: str = ""           # personal, home, business, vehicle
+    applicant_name: str = ""          # Full name of applicant
+    pan_number: str = ""              # PAN card number (KYC)
+    loan_type: str = ""               # personal, home, business, vehicle, msme
     loan_amount: float = 0.0
+    tenure_months: int = 0            # Alias for loan_tenure_months (UI-facing)
     loan_tenure_months: int = 0
 
     # Document processing results
-    documents_received: list[str] = Field(default_factory=list)  # doc types
+    documents_received: list[str] = Field(default_factory=list)
     documents_validated: bool = False
-    extracted_data: dict[str, Any] = Field(default_factory=dict)  # structured from docs
+    extracted_data: dict[str, Any] = Field(default_factory=dict)
 
     # Financial analysis
     monthly_income: float = 0.0
@@ -34,9 +37,9 @@ class LoanApplicationState(BaseModel):
 
     # Credit scoring
     credit_score: float = 0.0
-    bureau_score: int = 0         # CIBIL/Experian score
-    internal_score: float = 0.0   # ML model output
-    score_factors: list[dict] = Field(default_factory=list)  # SHAP values
+    bureau_score: int = 0
+    internal_score: float = 0.0
+    score_factors: list[dict] = Field(default_factory=list)
 
     # Fraud signals
     fraud_risk_score: float = 0.0
@@ -45,13 +48,13 @@ class LoanApplicationState(BaseModel):
     bank_account_verified: bool = False
 
     # Compliance
-    kyc_status: str = ""          # complete, incomplete, flagged
-    pmla_check: bool = False      # PMLA compliance
+    kyc_status: str = ""
+    pmla_check: bool = False
     rbi_compliant: bool = False
     compliance_flags: list[str] = Field(default_factory=list)
 
     # Decision
-    decision: str = ""            # approved, rejected, review
+    decision: str = ""
     decision_reason: str = ""
     approved_amount: float = 0.0
     approved_tenure: int = 0

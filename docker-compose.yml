@@ -25,6 +25,27 @@ services:
     env_file: .env
     command: python -m backend.mcp_servers.rbi_compliance_mcp.server
 
+  bank-txn-mcp:
+    build: { context: ., dockerfile: infra/docker/backend.Dockerfile }
+    ports: ["9002:9002"]
+    env_file: .env
+    command: python -m backend.mcp_servers.bank_txn_mcp.server
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  gst-mcp:
+    build: { context: ., dockerfile: infra/docker/backend.Dockerfile }
+    ports: ["9003:9003"]
+    env_file: .env
+    command: python -m backend.mcp_servers.gst_mcp.server
+
+  penny-drop-mcp:
+    build: { context: ., dockerfile: infra/docker/backend.Dockerfile }
+    ports: ["9005:9005"]
+    env_file: .env
+    command: python -m backend.mcp_servers.penny_drop_mcp.server
+
+
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.20.2
     ports: ["5000:5000"]

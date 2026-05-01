@@ -115,7 +115,7 @@ class TestCreditScorer:
         result = await agent.score(state)
         assert 0 <= result["credit_score"] <= 1
         assert result["risk_tier"] in ["PRIME", "NEAR_PRIME", "SUBPRIME", "HIGH_RISK"]
-        assert isinstance(result["score_factors"], dict)
+        assert isinstance(result["score_factors"], list)
 
     @pytest.mark.asyncio
     async def test_high_income_low_dti_gives_prime_tier(self):
@@ -200,6 +200,6 @@ class TestLoanState:
         )
         assert state.fraud_flags == []
         assert state.compliance_flags == []
-        assert state.score_factors == {}
+        assert state.score_factors == []
         assert state.shap_values == {}
         assert state.decision is None

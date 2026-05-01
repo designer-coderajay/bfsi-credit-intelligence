@@ -44,7 +44,8 @@ Return ONLY valid JSON:
 
 
 class FinancialAnalystAgent:
-    def __init__(self):
+    def __init__(self, llm=None):
+        # llm param accepted for interface compat; agent creates its own instance
         self.llm = ChatAnthropic(
             model=settings.llm_model,
             api_key=settings.anthropic_api_key,
