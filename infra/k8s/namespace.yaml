@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bfsi-prod
+  labels:
+    name: bfsi-prod
+    compliance: rbi-dpdp-2023
+    data-classification: sensitive
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bfsi-config
+  namespace: bfsi-prod
+data:
+  kafka-bootstrap-servers: "bfsi-kafka.bfsi-prod.svc.cluster.local:9092"
+  mlflow-tracking-uri: "http://mlflow-svc.bfsi-prod.svc.cluster.local:5000"
+  mlflow-bucket: "bfsi-ml-models-production"
+  environment: "production"
+  dpdp-compliance-mode: "strict"
