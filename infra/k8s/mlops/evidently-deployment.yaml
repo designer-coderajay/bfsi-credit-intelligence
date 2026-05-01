@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evidently-monitoring
+  namespace: bfsi-prod
+  annotations:
+    description: "Evidently AI for credit model drift monitoring"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: evidently
+  template:
+    metadata:
+      labels:
+        app: evidently
+    spec:
+      containers:
+        - name: evidently
+          image: evidentlyai/evidently:0.4.28
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bfsi-secrets
+                  key: database-url
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evidently-svc
+  namespace: bfsi-prod
+spec:
+  selector:
+    app: evidently
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
